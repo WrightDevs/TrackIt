@@ -186,7 +186,7 @@ document.getElementById("downloadCSV").addEventListener("click", () => {
   if (link.download !== undefined) {
     const url = URL.createObjectURL(blob)
     link.setAttribute("href", url)
-    link.setAttribute("download", "expenses.csv")
+    link.setAttribute("download", "expenses.pdf")
     link.style.visibility = "hidden"
     document.body.appendChild(link)
     link.click()
