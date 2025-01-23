@@ -1,202 +1,243 @@
-let currentUser = JSON.parse(localStorage.getItem("currentUser"))
-let expenses = []
-let balance = 0
+// Import Firebase modules
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
+import { getDatabase, ref, set, get, push } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
 
-const loginForm = document.getElementById("loginForm")
-const registerForm = document.getElementById("registerForm")
-const calculator = document.getElementById("calculator")
-const usernameSpan = document.getElementById("username")
-const balanceSpan = document.getElementById("balance")
-const expenseTable = document.getElementById("expenseTable")
-const filterCategory = document.getElementById("filterCategory")
+// Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyDu5Fz9meST0xVPgI711QrOqHvQswqYLYY",
+  authDomain: "spendscope212.firebaseapp.com",
+  databaseURL: "https://spendscope212-default-rtdb.firebaseio.com",
+  projectId: "spendscope212",
+  storageBucket: "spendscope212.appspot.com",
+  messagingSenderId: "145859682350",
+  appId: "1:145859682350:web:597295e731d1ca375abfbf"
+};
 
-const showLoginForm = () => {
-  loginForm.classList.remove("d-none")
-  registerForm.classList.add("d-none")
-  calculator.classList.add("d-none")
-}
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const auth = getAuth(app);
 
-const showRegisterForm = () => {
-  loginForm.classList.add("d-none")
-  registerForm.classList.remove("d-none")
-  calculator.classList.add("d-none")
-}
+document.addEventListener("DOMContentLoaded", () => {
+  const predefinedActivationCodes = ["ABCD1234EF", "GHIJ5678KL", "MNOP9101QR", "STUV2345WX", "YZAB6789CD"];
+  let currentUser = JSON.parse(localStorage.getItem("currentUser")) || null;
+  let usedActivationCodes = JSON.parse(localStorage.getItem("usedActivationCodes")) || [];
+  let balance = parseFloat(localStorage.getItem("balance")) || 0;
+  let expenses = JSON.parse(localStorage.getItem("expenses")) || [];
 
-const showCalculator = () => {
-  loginForm.classList.add("d-none")
-  registerForm.classList.add("d-none")
-  calculator.classList.remove("d-none")
-  loadUserData()
-}
+  const activationForm = document.getElementById("activationForm");
+  const registerForm = document.getElementById("registerForm");
+  const loginForm = document.getElementById("loginForm");
+  const loginSection = document.getElementById("loginSection");
+  const registerSection = document.getElementById("registerSection");
+  const expenseTrackerSection = document.getElementById("expenseTrackerSection");
+  const expenseTable = document.getElementById("expenseTable");
+  const balanceElement = document.getElementById("balance");
+  const usernameElement = document.getElementById("username");
 
-const loadUserData = () => {
-  usernameSpan.textContent = currentUser.username
-  expenses = JSON.parse(localStorage.getItem(`expenses_${currentUser.username}`)) || []
-  balance = Number.parseFloat(localStorage.getItem(`balance_${currentUser.username}`)) || 0
-  balanceSpan.textContent = balance.toFixed(2)
-  renderExpenses()
-}
+  const showLoginForm = () => {
+    loginSection.classList.remove("d-none");
+    registerSection.classList.add("d-none");
+    expenseTrackerSection.classList.add("d-none");
+  };
 
-const saveUserData = () => {
-  localStorage.setItem(`expenses_${currentUser.username}`, JSON.stringify(expenses))
-  localStorage.setItem(`balance_${currentUser.username}`, balance.toString())
-}
+  const showRegisterForm = () => {
+    loginSection.classList.add("d-none");
+    registerSection.classList.remove("d-none");
+    expenseTrackerSection.classList.add("d-none");
+  };
 
-const renderExpenses = () => {
-  const filteredExpenses = filterCategory.value
-    ? expenses.filter((expense) => expense.category === filterCategory.value)
-    : expenses
+  const showExpenseTracker = () => {
+    loginSection.classList.add("d-none");
+    registerSection.classList.add("d-none");
+    expenseTrackerSection.classList.remove("d-none");
+    usernameElement.textContent = currentUser.username;
+    balanceElement.textContent = balance.toFixed(2);
+    renderExpenses();
+  };
 
-  expenseTable.innerHTML = filteredExpenses
-    .map(
-      (expense) => `
-      <tr>
-        <td>${expense.item}</td>
-        <td>₦${expense.cost.toFixed(2)}</td>
-        <td>${expense.date}</td>
-        <td>${expense.category}</td>
-      </tr>
-    `,
-    )
-    .join("")
-}
+  const renderExpenses = () => {
+    expenseTable.innerHTML = "";
+    expenses.forEach((expense) => {
+      const row = document.createElement("tr");
+      row.innerHTML = `<td>${expense.item}</td><td>₦${expense.cost.toFixed(2)}</td><td>${expense.date}</td>`;
+      expenseTable.appendChild(row);
+    });
+  };
 
-const categorizeExpense = (item) => {
-  const categories = {
-    Food: ["food", "meal", "snack", "drink"],
-    Transport: ["bus", "taxi", "train", "transport"],
-    Entertainment: ["movie", "concert", "games", "entertainment"],
-  }
-
-  for (const [category, keywords] of Object.entries(categories)) {
-    if (keywords.some((keyword) => item.toLowerCase().includes(keyword))) {
-      return category
+  // Generate a unique device ID and persist it in local storage
+  const generateDeviceId = () => {
+    let deviceId = localStorage.getItem("deviceId");
+    if (!deviceId) {
+      deviceId = btoa(navigator.userAgent + Math.random().toString(36).substring(2));
+      localStorage.setItem("deviceId", deviceId);
     }
-  }
-  return "Others"
-}
+    return deviceId;
+  };
 
-document.getElementById("loginFormElement").addEventListener("submit", (e) => {
-  e.preventDefault()
-  const username = document.getElementById("loginUsername").value
-  const password = document.getElementById("loginPassword").value
-  const users = JSON.parse(localStorage.getItem("users")) || []
-  const user = users.find((u) => u.username === username && u.password === password)
-  if (user) {
-    currentUser = user
-    localStorage.setItem("currentUser", JSON.stringify(currentUser))
-    showCalculator()
-  } else {
-    alert("Invalid username or password")
-  }
-})
+  // Handle Registration Form submission
+  registerForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const username = document.getElementById("registerUsername").value.trim();
+    const password = document.getElementById("registerPassword").value.trim();
+    const confirmPassword = document.getElementById("confirmPassword").value.trim();
+    const activationCode = document.getElementById("activationCodeRegister").value.trim().toUpperCase();
 
-document.getElementById("registerFormElement").addEventListener("submit", (e) => {
-  e.preventDefault()
-  const username = document.getElementById("registerUsername").value
-  const password = document.getElementById("registerPassword").value
-  const confirmPassword = document.getElementById("confirmPassword").value
-  if (password !== confirmPassword) {
-    alert("Passwords do not match")
-    return
-  }
-  const users = JSON.parse(localStorage.getItem("users")) || []
-  if (users.some((u) => u.username === username)) {
-    alert("Username already exists")
-    return
-  }
-  users.push({ username, password })
-  localStorage.setItem("users", JSON.stringify(users))
-  alert("Registration successful! You can now log in.")
-  showLoginForm()
-})
+    if (password !== confirmPassword) {
+      alert("Passwords do not match");
+      return;
+    }
 
-document.getElementById("showRegister").addEventListener("click", showRegisterForm)
-document.getElementById("showLogin").addEventListener("click", showLoginForm)
+    if (!predefinedActivationCodes.includes(activationCode)) {
+      alert("Invalid activation code.");
+      return;
+    }
 
-document.getElementById("forgotPassword").addEventListener("click", () => {
-  const username = prompt("Enter your username:")
-  if (username) {
-    const users = JSON.parse(localStorage.getItem("users")) || []
-    const userIndex = users.findIndex((u) => u.username === username)
-    if (userIndex !== -1) {
-      const newPassword = prompt("Enter your new password:")
-      if (newPassword) {
-        users[userIndex].password = newPassword
-        localStorage.setItem("users", JSON.stringify(users))
-        alert("Password updated successfully!")
+    if (usedActivationCodes.includes(activationCode)) {
+      alert("This activation code has already been used.");
+      return;
+    }
+
+    const usersRef = ref(db, "users");
+    const usersSnapshot = await get(usersRef);
+    const users = usersSnapshot.val() || {};
+
+    if (Object.values(users).some((u) => u.username === username)) {
+      alert("Username already exists");
+      return;
+    }
+
+    const deviceId = generateDeviceId();
+
+    const newUser = {
+      username,
+      password,
+      deviceId,
+      balance: 0,
+      expenses: [],
+    };
+
+    const newUserRef = push(usersRef);
+    await set(newUserRef, newUser);
+
+    usedActivationCodes.push(activationCode);
+    localStorage.setItem("usedActivationCodes", JSON.stringify(usedActivationCodes));
+
+    alert("Registration successful! You can now log in.");
+    showLoginForm();
+  });
+
+  // Handle Login Form submission
+  loginForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const username = document.getElementById("loginUsername").value.trim();
+    const password = document.getElementById("loginPassword").value.trim();
+
+    const usersRef = ref(db, "users");
+    const usersSnapshot = await get(usersRef);
+    const users = usersSnapshot.val() || {};
+    const user = Object.values(users).find((u) => u.username === username && u.password === password);
+
+    if (user) {
+      const currentDeviceId = generateDeviceId();
+
+      if (user.deviceId !== currentDeviceId) {
+        alert("This account is not authorized to be used on this device.");
+        return;
       }
+
+      currentUser = { ...user, id: Object.keys(users).find(key => users[key] === user) };
+      localStorage.setItem("currentUser", JSON.stringify(currentUser));
+      showExpenseTracker();
     } else {
-      alert("Username not found!")
+      alert("Invalid username or password");
     }
-  }
-})
+  });
 
-document.getElementById("logoutBtn").addEventListener("click", () => {
-  localStorage.removeItem("currentUser")
-  currentUser = null
-  showLoginForm()
-})
+  // Show registration form
+  document.getElementById("showRegister").addEventListener("click", showRegisterForm);
+  document.getElementById("showLogin").addEventListener("click", showLoginForm);
 
-document.getElementById("expenseForm").addEventListener("submit", (e) => {
-  e.preventDefault()
-  const item = document.getElementById("item").value
-  const cost = Number.parseFloat(document.getElementById("cost").value)
-  const date = document.getElementById("date").value
-  const category = categorizeExpense(item)
+  // Logout
+  document.getElementById("logoutBtn").addEventListener("click", () => {
+    localStorage.removeItem("currentUser");
+    currentUser = null;
+    showLoginForm();
+  });
 
-  expenses.push({ item, cost, date, category })
-  balance -= cost
-  saveUserData()
-  loadUserData()
+  // Handle Add Money Modal submission
+  document.getElementById("topUpForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const amount = parseFloat(document.getElementById("amount").value);
+    if (amount > 0) {
+      balance += amount;
+      localStorage.setItem("balance", balance);
+      alert(`₦${amount.toFixed(2)} added successfully!`);
+      balanceElement.textContent = balance.toFixed(2);
+      renderExpenses();
+      const topUpModal = bootstrap.Modal.getInstance(document.getElementById("topUpModal"));
+      topUpModal.hide();
+    } else {
+      alert("Please enter a valid amount.");
+    }
+  });
 
-  document.getElementById("item").value = ""
-  document.getElementById("cost").value = ""
-  document.getElementById("date").value = ""
-})
+  // Handle Add Expense Form submission
+  document.getElementById("expenseForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const item = document.getElementById("item").value.trim();
+    const cost = parseFloat(document.getElementById("cost").value);
 
-const topUpModal = new bootstrap.Modal(document.getElementById("topUpModal"))
+    if (item && cost > 0) {
+      const newExpense = {
+        item,
+        cost,
+        date: new Date().toLocaleString(),
+      };
 
-document.getElementById("topUpBtn").addEventListener("click", () => {
-  topUpModal.show()
-})
+      expenses.push(newExpense);
+      localStorage.setItem("expenses", JSON.stringify(expenses));
+      balance -= cost;
+      localStorage.setItem("balance", balance);
 
-document.getElementById("confirmTopUp").addEventListener("click", () => {
-  const amount = Number.parseFloat(document.getElementById("topUpAmount").value)
-  if (!isNaN(amount) && amount > 0) {
-    balance += amount
-    saveUserData()
-    loadUserData()
-    topUpModal.hide()
-    document.getElementById("topUpAmount").value = ""
+      alert(`₦${cost.toFixed(2)} spent on ${item}`);
+      balanceElement.textContent = balance.toFixed(2);
+      renderExpenses();
+      document.getElementById("item").value = '';
+      document.getElementById("cost").value = '';
+    } else {
+      alert("Please provide valid item and cost values.");
+    }
+  });
+
+  // Download Expenses as PDF
+  document.getElementById("downloadBtn").addEventListener("click", () => {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const currentDate = new Date().toLocaleDateString();
+
+    doc.setFontSize(18);
+    doc.text("Expense Report", 14, 20);
+
+    doc.setFontSize(12);
+    doc.text(`Date: ${currentDate}`, 14, 30);
+
+    let yPosition = 40;
+    expenses.forEach((expense) => {
+      doc.text(`Item: ${expense.item}`, 14, yPosition);
+      doc.text(`Cost: ₦${expense.cost.toFixed(2)}`, 80, yPosition);
+      doc.text(`Date: ${expense.date}`, 150, yPosition);
+      yPosition += 10;
+    });
+
+    doc.text(`Total Balance: ₦${balance.toFixed(2)}`, 14, yPosition + 10);
+    doc.save("Expense_Report.pdf");
+  });
+
+  if (currentUser) {
+    showExpenseTracker();
   } else {
-    alert("Please enter a valid amount")
+    showLoginForm();
   }
-})
-
-filterCategory.addEventListener("change", renderExpenses)
-
-document.getElementById("downloadCSV").addEventListener("click", () => {
-  let csvContent = "Item,Cost (₦),Date,Category\n"
-  expenses.forEach((expense) => {
-    csvContent += `${expense.item},${expense.cost.toFixed(2)},${expense.date},${expense.category}\n`
-  })
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
-  const link = document.createElement("a")
-  if (link.download !== undefined) {
-    const url = URL.createObjectURL(blob)
-    link.setAttribute("href", url)
-    link.setAttribute("download", "expenses.pdf")
-    link.style.visibility = "hidden"
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-  }
-})
-
-if (currentUser) {
-  showCalculator()
-} else {
-  showLoginForm()
-}
-
+});
