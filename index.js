@@ -1,5 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const predefinedActivationCodes = ["ABCD1234EF", "GHIJ5678KL", "MNOP9101QR", "STUV2345WX", "YZAB6789CD", "DivineTheDivine"]
+  const predefinedActivationCodes = ["ABCD1234EF", "GHIJ5678KL", "MNOP9101QR", "STUV2345WX", "YZAB6789CD", "DivineTheDivine","DRUNE"]
   let currentUser = JSON.parse(localStorage.getItem("currentUser"))
   const usedActivationCodes = JSON.parse(localStorage.getItem("usedActivationCodes")) || []
   let balance = Number.parseFloat(localStorage.getItem("balance")) || 0
